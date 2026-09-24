@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "file": "cloudStorage.d.ts",
+  "sourceRoot": "",
+  "sources": [
+    "cloudStorage.ts"
+  ],
+  "names": [],
+  "mappings": "AAAA,OAAO,EAAE,EAAE,IAAI,UAAU,EAAE,MAAM,YAAY,CAAC;AAW9C,OAAO,EAAE,UAAU,EAAE,CAAC"
+}

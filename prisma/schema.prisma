@@ -1,0 +1,416 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum UnitType {
+  WEIGHT
+  PIECE
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  CARD
+  WALLET
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYMOB
+  COD
+}
+
+enum PaymentStatusType {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password_hash String
+  first_name    String
+  last_name     String
+  phone         String?
+  role          Role      @default(CUSTOMER)
+  is_verified   Boolean   @default(false)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  addresses      Address[]
+  carts          Cart[]
+  orders         Order[]
+  wishlists      Wishlist[]
+  reviews        Review[]
+  coupon_usages  CouponUsage[]
+  refresh_tokens RefreshToken[]
+  password_resets PasswordResetToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id            String   @id @default(uuid())
+  // sha256 hash of the raw token; the raw token itself is never persisted
+  token_hash    String   @unique
+  user_id       String
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+
+  @@index([user_id])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  token_hash String   @unique
+  user_id    String
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+  @@map("password_reset_tokens")
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  label       String   // e.g. "home", "work", "other"
+  full_name   String
+  phone       String
+  street      String
+  city        String
+  governorate String
+  postal_code String?
+  is_default  Boolean  @default(false)
+
+  orders      Order[]
+
+  @@index([user_id])
+  @@map("addresses")
+}
+
+model Category {
+  id         String     @id @default(uuid())
+  parent_id  String?
+  parent     Category?  @relation("Subcategories", fields: [parent_id], references: [id], onDelete: SetNull)
+  children   Category[] @relation("Subcategories")
+  name       String     // canonical/fallback name
+  name_ar    String?
+  name_en    String?
+  slug       String     @unique
+  image_url  String?
+  is_active  Boolean    @default(true)
+
+  products   Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  category_id    String
+  category       Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  name           String   // canonical/fallback name
+  name_ar        String?
+  name_en        String?
+  slug           String   @unique
+  description    String?  // canonical/fallback description
+  description_ar String?
+  description_en String?
+  unit_type      UnitType
+  price_per_kg   Float?   // Only if unit_type == WEIGHT
+  fixed_price    Float?   // Only if unit_type == PIECE
+  stock_in_grams Int      // Universal stock tracking (PIECE products treat 1 qty = 1 gram or ignore)
+  sku            String   @unique
+  thumbnail_url  String?
+  brand          String?
+  is_active      Boolean  @default(true)
+  is_featured    Boolean  @default(false)
+  // Normalised (diacritics/tatweel-stripped, unified letters) search text used for `contains` search
+  search_text    String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  images           ProductImage[]
+  weight_variants  ProductWeightVariant[]
+  cart_items       CartItem[]
+  order_items      OrderItem[]
+  wishlist_items   WishlistItem[]
+  reviews          Review[]
+
+  @@index([category_id])
+  @@index([is_active, is_featured])
+  @@index([brand])
+  @@index([search_text])
+  @@map("products")
+}
+
+model ProductImage {
+  id         String  @id @default(uuid())
+  product_id String
+  product    Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  url        String
+  sort_order Int     @default(0)
+
+  @@map("product_images")
+}
+
+model WeightOption {
+  id             String  @id @default(uuid())
+  label          String  // e.g., "ربع كيلو", "نص كيلو", "كيلو"
+  value_in_grams Int     // e.g., 250, 500, 1000
+  is_active      Boolean @default(true)
+
+  product_weight_variants ProductWeightVariant[]
+
+  @@map("weight_options")
+}
+
+model ProductWeightVariant {
+  id               String       @id @default(uuid())
+  product_id       String
+  product          Product      @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  weight_option_id String
+  weight_option    WeightOption @relation(fields: [weight_option_id], references: [id], onDelete: Restrict)
+  price            Float        // Calculated or overridden manually
+  // Stock convention: stock_in_grams is ALWAYS in grams, even though a "unit" of this
+  // variant equals `weight_option.value_in_grams` grams. Anywhere we need "units available"
+  // we must divide stock_in_grams by weight_option.value_in_grams (floor), and anywhere we
+  // decrement for an order of N units we must decrement stock_in_grams by N * value_in_grams.
+  stock_in_grams   Int?         // Specific stock if needed, else rely on product's total stock
+  sku              String?      @unique
+
+  cart_items       CartItem[]
+  order_items      OrderItem[]
+
+  @@map("product_weight_variants")
+}
+
+model Cart {
+  id         String   @id @default(uuid())
+  user_id    String?  @unique // One active cart per user
+  user       User?    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  session_id String?  @unique // Guest support
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  items      CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id                    String                @id @default(uuid())
+  cart_id               String
+  cart                  Cart                  @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  product_id            String
+  product               Product               @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  weight_variant_id     String?
+  weight_variant        ProductWeightVariant? @relation(fields: [weight_variant_id], references: [id], onDelete: SetNull)
+  quantity              Int
+  price_snapshot        Float
+  weight_snapshot_grams Int?                  // Preserved for weight variants
+
+  @@index([cart_id])
+  @@map("cart_items")
+}
+
+model Order {
+  id               String        @id @default(uuid())
+  user_id          String
+  user             User          @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  address_id       String
+  address          Address       @relation(fields: [address_id], references: [id], onDelete: Restrict)
+  status           OrderStatus   @default(PENDING)
+  payment_status   PaymentStatus @default(UNPAID)
+  payment_method   PaymentMethod
+  subtotal         Float
+  shipping_fee     Float         @default(0)
+  discount         Float         @default(0)
+  total            Float
+  notes            String?
+  idempotency_key  String?       @unique
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  items          OrderItem[]
+  payments       Payment[]
+  coupon_usages  CouponUsage[]
+  status_history OrderStatusHistory[]
+
+  @@index([user_id, created_at])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderStatusHistory {
+  id                 String   @id @default(uuid())
+  order_id           String
+  order              Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  from_status        OrderStatus?
+  to_status          OrderStatus
+  changed_by_user_id String?
+  note               String?
+  created_at         DateTime @default(now())
+
+  @@index([order_id])
+  @@map("order_status_history")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actor_id   String?
+  action     String
+  entity     String
+  entity_id  String
+  before     Json?
+  after      Json?
+  ip         String?
+  created_at DateTime @default(now())
+
+  @@index([entity, entity_id])
+  @@index([actor_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+model OrderItem {
+  id                    String                @id @default(uuid())
+  order_id              String
+  order                 Order                 @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product_id            String
+  product               Product               @relation(fields: [product_id], references: [id], onDelete: Restrict)
+  weight_variant_id     String?
+  weight_variant        ProductWeightVariant? @relation(fields: [weight_variant_id], references: [id], onDelete: SetNull)
+  product_name_snapshot String
+  weight_label_snapshot String?
+  weight_grams_snapshot Int?
+  quantity              Int
+  unit_price            Float
+  total_price           Float
+
+  @@index([product_id])
+  @@map("order_items")
+}
+
+model Payment {
+  id                      String            @id @default(uuid())
+  order_id                String
+  order                   Order             @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  provider                PaymentProvider
+  provider_transaction_id String?
+  amount                  Float
+  status                  PaymentStatusType @default(PENDING)
+  paid_at                 DateTime?
+
+  @@map("payments")
+}
+
+model Wishlist {
+  id      String         @id @default(uuid())
+  user_id String         @unique
+  user    User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  items   WishlistItem[]
+
+  @@map("wishlists")
+}
+
+model WishlistItem {
+  id          String   @id @default(uuid())
+  wishlist_id String
+  wishlist    Wishlist @relation(fields: [wishlist_id], references: [id], onDelete: Cascade)
+  product_id  String
+  product     Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  added_at    DateTime @default(now())
+
+  @@map("wishlist_items")
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  product_id  String
+  product     Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  rating      Int      // 1 to 5
+  comment     String?
+  is_approved Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  @@index([product_id, is_approved])
+  @@map("reviews")
+}
+
+model Coupon {
+  id               String        @id @default(uuid())
+  code             String        @unique
+  type             CouponType
+  value            Float
+  min_order_amount Float         @default(0)
+  max_uses         Int?
+  used_count       Int           @default(0)
+  expires_at       DateTime
+  is_active        Boolean       @default(true)
+
+  usages           CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  coupon_id String
+  coupon    Coupon   @relation(fields: [coupon_id], references: [id], onDelete: Cascade)
+  user_id   String
+  user      User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  order_id  String   @unique
+  order     Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  used_at   DateTime @default(now())
+
+  @@index([user_id, coupon_id])
+  @@map("coupon_usage")
+}
+
+model Setting {
+  key        String   @id
+  value      String
+  updated_at DateTime @updatedAt
+
+  @@map("settings")
+}
