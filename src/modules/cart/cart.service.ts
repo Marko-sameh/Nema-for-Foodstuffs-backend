@@ -6,7 +6,40 @@ export class CartService {
 
   async getCart(userId?: string, sessionId?: string) {
     if (!userId && !sessionId) throw { statusCode: 400, message: 'User ID or Session ID required' };
-    return this.repository.getOrCreateCart(userId, sessionId);
+    const cart = await this.repository.getOrCreateCart(userId, sessionId);
+    return this.formatCartResponse(cart);
+  }
+
+  private formatCartResponse(cart: any) {
+    let subtotal = 0;
+    let itemCount = 0;
+    
+    const items = (cart.items || []).map((item: any) => {
+      subtotal += Number(item.price_snapshot) * item.quantity;
+      itemCount += item.quantity;
+      return {
+        id: item.id,
+        productId: item.product_id,
+        weightVariantId: item.weight_variant_id,
+        quantity: item.quantity,
+        price: Number(item.price_snapshot),
+        product: item.product ? {
+          name: item.product.name,
+          nameAr: item.product.name_ar || item.product.name,
+          nameEn: item.product.name_en || item.product.name,
+          thumbnailUrl: item.product.thumbnail_url,
+          unitType: item.product.unit_type,
+        } : undefined,
+      };
+    });
+
+    return {
+      id: cart.id,
+      items,
+      subtotal,
+      total: subtotal,
+      itemCount,
+    };
   }
 
   async addItem(data: AddToCartInput, userId?: string, sessionId?: string) {

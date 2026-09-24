@@ -1,26 +1,47 @@
-import { prisma } from '../../config/db';
-import { CreateProductInput, UpdateProductInput, AddProductImageInput, ProductSort } from './product.dto';
-import { buildProductSearchText, normalizeSearchText } from '../search/arabic';
+import { prisma } from "../../config/db";
+import {
+  CreateProductInput,
+  UpdateProductInput,
+  AddProductImageInput,
+  ProductSort,
+} from "./product.dto";
+import { buildProductSearchText, normalizeSearchText } from "../search/arabic";
 
 function sortToOrderBy(sort?: ProductSort) {
   switch (sort) {
-    case 'price_asc':
+    case "price_asc":
       // Sort by whichever price field is set; Prisma cannot coalesce in orderBy,
       // so we approximate with fixed_price then price_per_kg as secondary tie-break.
-      return [{ fixed_price: 'asc' as const }, { price_per_kg: 'asc' as const }];
-    case 'price_desc':
-      return [{ fixed_price: 'desc' as const }, { price_per_kg: 'desc' as const }];
-    case 'name':
-      return [{ name: 'asc' as const }];
-    case 'newest':
+      return [
+        { fixed_price: "asc" as const },
+        { price_per_kg: "asc" as const },
+      ];
+    case "price_desc":
+      return [
+        { fixed_price: "desc" as const },
+        { price_per_kg: "desc" as const },
+      ];
+    case "name":
+      return [{ name: "asc" as const }];
+    case "newest":
     default:
-      return [{ created_at: 'desc' as const }];
+      return [{ created_at: "desc" as const }];
   }
 }
 
 export class ProductRepository {
   async findAll(query: any) {
-    const { category, categories, brand, brands, isFeatured, search, minPrice, maxPrice, sort } = query;
+    const {
+      category,
+      categories,
+      brand,
+      brands,
+      isFeatured,
+      search,
+      minPrice,
+      maxPrice,
+      sort,
+    } = query;
     const where: any = { is_active: true };
 
     if (category) where.category_id = category;
@@ -33,10 +54,10 @@ export class ProductRepository {
       where.brand = { in: brands };
     }
 
-    if (isFeatured) where.is_featured = isFeatured === 'true';
+    if (isFeatured) where.is_featured = isFeatured === "true";
     if (search) {
       const normalized = normalizeSearchText(search);
-      where.search_text = { contains: normalized, mode: 'insensitive' };
+      where.search_text = { contains: normalized, mode: "insensitive" };
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
@@ -60,7 +81,9 @@ export class ProductRepository {
       prisma.product.findMany({
         where,
         include: {
-          category: { select: { name: true, name_ar: true, name_en: true, slug: true } },
+          category: {
+            select: { name: true, name_ar: true, name_en: true, slug: true },
+          },
           weight_variants: { include: { weight_option: true } },
         },
         orderBy: sortToOrderBy(sort),
@@ -73,12 +96,19 @@ export class ProductRepository {
     return { data, total };
   }
 
-  async findBySlug(slug: string, includeInactive: boolean) {
-    return prisma.product.findUnique({
-      where: { slug, ...(includeInactive ? {} : { is_active: true }) },
+  async findBySlug(slugOrId: string, includeInactive: boolean) {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        slugOrId,
+      );
+    return prisma.product.findFirst({
+      where: {
+        ...(isUuid ? { id: slugOrId } : { slug: slugOrId }),
+        ...(includeInactive ? {} : { is_active: true }),
+      },
       include: {
         category: true,
-        images: { orderBy: { sort_order: 'asc' } },
+        images: { orderBy: { sort_order: "asc" } },
         weight_variants: { include: { weight_option: true } },
       },
     });
@@ -92,7 +122,9 @@ export class ProductRepository {
   }
 
   async findImageForProduct(productId: string, imgId: string) {
-    return prisma.productImage.findFirst({ where: { id: imgId, product_id: productId } });
+    return prisma.productImage.findFirst({
+      where: { id: imgId, product_id: productId },
+    });
   }
 
   async countOrderItemsForProduct(productId: string) {
@@ -132,7 +164,7 @@ export class ProductRepository {
         },
       });
 
-      if (data.unitType === 'WEIGHT' && data.weightVariants?.length) {
+      if (data.unitType === "WEIGHT" && data.weightVariants?.length) {
         await tx.productWeightVariant.createMany({
           data: data.weightVariants.map((v) => ({
             product_id: product.id,
@@ -185,14 +217,20 @@ export class ProductRepository {
       });
 
       if (data.weightVariants !== undefined) {
-        const existingVariants = await tx.productWeightVariant.findMany({ where: { product_id: id } });
-        const incomingIds = data.weightVariants.map((v: any) => v.id).filter(Boolean);
+        const existingVariants = await tx.productWeightVariant.findMany({
+          where: { product_id: id },
+        });
+        const incomingIds = data.weightVariants
+          .map((v: any) => v.id)
+          .filter(Boolean);
 
         // Delete variants not in incoming array
-        const toDelete = existingVariants.filter((v: any) => !incomingIds.includes(v.id));
+        const toDelete = existingVariants.filter(
+          (v: any) => !incomingIds.includes(v.id),
+        );
         if (toDelete.length > 0) {
           await tx.productWeightVariant.deleteMany({
-            where: { id: { in: toDelete.map((v: any) => v.id) } }
+            where: { id: { in: toDelete.map((v: any) => v.id) } },
           });
         }
 
@@ -202,11 +240,21 @@ export class ProductRepository {
           if (variantId) {
             await tx.productWeightVariant.update({
               where: { id: variantId },
-              data: { price: v.price, stock_in_grams: v.stockInGrams, sku: v.sku }
+              data: {
+                price: v.price,
+                stock_in_grams: v.stockInGrams,
+                sku: v.sku,
+              },
             });
           } else {
             await tx.productWeightVariant.create({
-              data: { product_id: id, weight_option_id: v.weightOptionId, price: v.price, stock_in_grams: v.stockInGrams, sku: v.sku }
+              data: {
+                product_id: id,
+                weight_option_id: v.weightOptionId,
+                price: v.price,
+                stock_in_grams: v.stockInGrams,
+                sku: v.sku,
+              },
             });
           }
         }

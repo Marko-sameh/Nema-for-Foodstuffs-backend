@@ -17,6 +17,36 @@ export class OrderService {
   private repository = new OrderRepository();
   private cartService = new CartService();
 
+  private formatOrderResponse(order: any) {
+    if (!order) return order;
+    return {
+      id: order.id,
+      userId: order.user_id,
+      addressId: order.address_id,
+      status: order.status,
+      paymentStatus: order.payment_status,
+      paymentMethod: order.payment_method,
+      subtotal: Number(order.subtotal),
+      deliveryFee: Number(order.shipping_fee),
+      discount: Number(order.discount),
+      total: Number(order.total),
+      couponCode: order.coupon_code,
+      notes: order.notes,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      items: order.items?.map((item: any) => ({
+        id: item.id,
+        orderId: item.order_id,
+        productId: item.product_id,
+        productName: item.product_name_snapshot,
+        unitType: item.unit_type_snapshot || 'PIECE', // fallback if missing
+        quantity: item.quantity,
+        price: Number(item.unit_price),
+        weightVariantId: item.weight_variant_id,
+      })),
+    };
+  }
+
   async createOrder(userId: string, data: CreateOrderInput, idempotencyKeyHeader?: string) {
     const idempotencyKey = idempotencyKeyHeader || data.idempotencyKey;
 
@@ -124,13 +154,13 @@ export class OrderService {
     try {
       const order = await this.repository.createOrderWithTransaction(userId, orderData, processedItems, couponForTransaction);
       await this.cartService.clearCart(userId);
-      return order;
+      return this.formatOrderResponse(order);
     } catch (error: any) {
       // Handle the unique-constraint race on idempotency_key: another concurrent request
       // won the race, so return that order instead of erroring out.
       if (idempotencyKey && error?.code === 'P2002') {
         const existing = await this.repository.findOrderByIdempotencyKey(userId, idempotencyKey);
-        if (existing) return existing;
+        if (existing) return this.formatOrderResponse(existing);
       }
       throw error;
     }
@@ -139,13 +169,13 @@ export class OrderService {
   async getUserOrders(userId: string, query: any) {
     const { skip, take, page, limit } = getPaginationData(query);
     const { data, total } = await this.repository.findUserOrders(userId, { skip, take });
-    return { data, total, page, limit };
+    return { data: data.map((o: any) => this.formatOrderResponse(o)), total, page, limit };
   }
 
   async getOrderById(id: string, userId: string) {
     const order = await this.repository.findOrderById(id, userId);
     if (!order) throw { statusCode: 404, message: 'Order not found' };
-    return order;
+    return this.formatOrderResponse(order);
   }
 
   async cancelOrder(id: string, userId: string) {
@@ -156,20 +186,21 @@ export class OrderService {
       throw { statusCode: 400, message: 'Order cannot be cancelled at this stage' };
     }
 
-    return this.repository.cancelOrderAndRestoreStock(id, order.status, userId, 'Cancelled by customer');
+    const cancelledOrder = await this.repository.cancelOrderAndRestoreStock(id, order.status, userId, 'Cancelled by customer');
+    return this.formatOrderResponse(cancelledOrder);
   }
 
   // Admin methods
   async getAllOrders(query: any) {
     const { skip, take, page, limit } = getPaginationData(query);
     const { data, total } = await this.repository.findAllOrders({ skip, take });
-    return { data, total, page, limit };
+    return { data: data.map((o: any) => this.formatOrderResponse(o)), total, page, limit };
   }
 
   async adminGetOrderById(id: string) {
     const order = await this.repository.findOrderById(id);
     if (!order) throw { statusCode: 404, message: 'Order not found' };
-    return order;
+    return this.formatOrderResponse(order);
   }
 
   async updateOrderStatus(id: string, data: UpdateOrderStatusInput, changedByUserId?: string) {
@@ -182,9 +213,11 @@ export class OrderService {
     }
 
     if (data.status === 'CANCELLED' && order.status !== 'CANCELLED') {
-      return this.repository.cancelOrderAndRestoreStock(id, order.status, changedByUserId, data.note);
+      const cancelledOrder = await this.repository.cancelOrderAndRestoreStock(id, order.status, changedByUserId, data.note);
+      return this.formatOrderResponse(cancelledOrder);
     }
 
-    return this.repository.updateOrderStatusWithHistory(id, data, order.status, changedByUserId);
+    const updatedOrder = await this.repository.updateOrderStatusWithHistory(id, data, order.status, changedByUserId);
+    return this.formatOrderResponse(updatedOrder);
   }
 }

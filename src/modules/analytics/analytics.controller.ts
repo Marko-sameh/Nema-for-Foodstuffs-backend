@@ -16,8 +16,8 @@ export class AnalyticsController {
 
   getSales = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const period = req.query.period as 'daily' | 'monthly';
-      const result = await this.service.getSales(period);
+      const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
+      const result = await this.service.getSales(days);
       successResponse(res, 200, 'Sales analytics', result);
     } catch (error) {
       next(error);

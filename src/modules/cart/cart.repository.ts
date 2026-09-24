@@ -8,7 +8,7 @@ export class CartRepository {
       include: {
         items: {
           include: {
-            product: { select: { id: true, name: true, slug: true, thumbnail_url: true, unit_type: true, stock_in_grams: true } },
+            product: { select: { id: true, name: true, name_ar: true, name_en: true, slug: true, thumbnail_url: true, unit_type: true, stock_in_grams: true } },
             weight_variant: { include: { weight_option: true } },
           },
         },
