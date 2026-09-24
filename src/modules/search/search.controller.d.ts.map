@@ -1,1 +1,0 @@
-{"version":3,"file":"search.controller.d.ts","sourceRoot":"","sources":["search.controller.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,QAAQ,EAAE,YAAY,EAAE,MAAM,SAAS,CAAC;AAI1D,qBAAa,gBAAgB;IAC3B,OAAO,CAAC,OAAO,CAAuB;IAEtC,MAAM,GAAU,KAAK,OAAO,EAAE,KAAK,QAAQ,EAAE,MAAM,YAAY,mBAU7D;CACH"}

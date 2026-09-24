@@ -3,7 +3,7 @@ import { UserController } from './user.controller';
 import { validate } from '../../shared/middleware/validate';
 import { authMiddleware } from '../../shared/middleware/auth.middleware';
 import { adminMiddleware } from '../../shared/middleware/admin.middleware';
-import { strictLimiter } from '../../shared/middleware/rateLimiter';
+import { strictLimiter } from '../../shared/middleware/rate-limiter';
 import { updateProfileSchema, updatePasswordSchema, adminUpdateUserSchema, userIdParamSchema, listUsersQuerySchema } from './user.dto';
 
 const router = Router();

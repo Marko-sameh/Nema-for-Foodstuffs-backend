@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { validate } from '../../shared/middleware/validate';
 import { authMiddleware } from '../../shared/middleware/auth.middleware';
-import { authLimiter, strictLimiter } from '../../shared/middleware/rateLimiter';
+import { authLimiter, strictLimiter } from '../../shared/middleware/rate-limiter';
 import { registerSchema, loginSchema, refreshTokenSchema, forgotPasswordSchema, resetPasswordSchema } from './auth.dto';
 
 const router = Router();

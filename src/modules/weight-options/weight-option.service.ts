@@ -1,5 +1,5 @@
 import { WeightOptionRepository } from './weight-option.repository';
-import { writeAuditLog } from '../../shared/utils/auditLog';
+import { writeAuditLog } from '../../shared/utils/audit-log';
 import { prisma } from '../../config/db';
 import { CreateWeightOptionInput, UpdateWeightOptionInput } from './weight-option.dto';
 

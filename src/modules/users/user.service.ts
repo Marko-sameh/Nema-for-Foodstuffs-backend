@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { UserRepository } from './user.repository';
 import { getPaginationData } from '../../shared/utils/paginate';
 import { UpdateProfileInput, UpdatePasswordInput, AdminUpdateUserInput, ListUsersQuery } from './user.dto';
-import { writeAuditLog } from '../../shared/utils/auditLog';
+import { writeAuditLog } from '../../shared/utils/audit-log';
 import { prisma } from '../../config/db';
 
 export class UserService {

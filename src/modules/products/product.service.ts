@@ -1,6 +1,6 @@
 import { createUniqueSlug } from '../../shared/utils/slugify';
 import { getPaginationData } from '../../shared/utils/paginate';
-import { writeAuditLog } from '../../shared/utils/auditLog';
+import { writeAuditLog } from '../../shared/utils/audit-log';
 import { prisma } from '../../config/db';
 import { ProductRepository } from './product.repository';
 import { CreateProductInput, UpdateProductInput, AddProductImageInput } from './product.dto';

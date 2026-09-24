@@ -1,6 +1,6 @@
 import { SettingsRepository } from './settings.repository';
 import { UpdateSettingsInput } from './settings.dto';
-import { writeAuditLog } from '../../shared/utils/auditLog';
+import { writeAuditLog } from '../../shared/utils/audit-log';
 import { prisma } from '../../config/db';
 
 export interface ActorContext {
